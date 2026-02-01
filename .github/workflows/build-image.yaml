@@ -1,0 +1,46 @@
+name: Build Docker image artifact
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOCKER_IMAGE_NAME: hello:latest
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.DOCKER_IMAGE_NAME }}
+          cache-from: type=gha,scope=${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
+
+      - name: Export image to tar + extracted folder
+        run: |
+          mkdir -p out/images/hello
+          docker image save ${{ env.DOCKER_IMAGE_NAME }} -o out/hello-image.tar
+          tar -xf out/hello-image.tar -C out/images/hello
+
+      - name: Upload artifact (image export)
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-export
+          path: out
+          if-no-files-found: error
+          retention-days: 7
